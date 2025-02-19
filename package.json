@@ -1,6 +1,14 @@
 {
-  "dependencies": {
-    "@types/react": "^19.0.10",
-    "react": "^19.0.0"
-  }
+  "name": "i18n",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "i18n-extract": "./bin/cli"
+  },
+  "author": "",
+  "license": "ISC"
 }

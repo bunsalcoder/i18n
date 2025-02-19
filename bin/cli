@@ -1,0 +1,115 @@
+#! /usr/bin/env node
+
+const [_node, _cli, pathToScan] = process.argv;
+
+const path = require("path");
+const fs = require("fs");
+
+const colors = {
+  black: "0;30",
+  darkGray: "0;30",
+  red: "0;31",
+  lightRed: "1;31",
+  green: "0;32",
+  lightGreen: "0;32",
+  orange: "0;33",
+  yellow: "1;33",
+  blue: "0;34",
+  lightBlue: "1;34",
+  purple: "0;35",
+  lightPurple: "1;35",
+  cyan: "0;36",
+  lightCyan: "1;36",
+  lightGray: "0;37",
+  white: "1;37",
+};
+
+const filesToScan = [".ts", ".tsx", ".js", ".jsx"];
+const translateReg = /translate\((.)+\)/g;
+
+const display = (name, tab, color = "0;33") => {
+  const theColor = colors[color] || color;
+  console.log(`${tab}├─ \x1b[${theColor}m${name}\x1b[0m`);
+};
+
+const indentTab = (tab) => `${tab}│  `;
+
+const scanTranslate = (filePath, tab) => {
+  const content = fs.readFileSync(filePath, { encoding: "utf8" });
+  const founds = content.match(translateReg) || [];
+  const filename = path.basename(filePath);
+
+  const [color, suffix] =
+    founds.length > 0 ? ["green", ` [${founds.length}]`] : ["30", ""];
+
+  display(`${filename}${suffix}`, tab, color);
+
+  return founds.reduce((carry, found) => {
+    const [trim] = found
+      .replace("translate", "")
+      .replaceAll(/^\(|\)$/g, "")
+      // .match(/^['"](.+)['"]/, '$1') || ['\x1b[1;31m--Dynamic--\x1b[0m'];
+      .match(/^['"](.+)['"]/, "$1") || [found];
+
+    const clean = trim.replaceAll(/^['"]|['"]$/g, "");
+    display(`${clean} \x1b[35m${found}\x1b[0m`, indentTab(tab), "99");
+    return {
+      ...carry,
+      [clean.toLowerCase()]: clean,
+    };
+  }, {});
+};
+
+const proceedFile = (filePath, tab) => {
+  const ext = path.extname(filePath);
+  const baseName = path.basename(filePath);
+
+  if (!filesToScan.includes(ext)) {
+    display(baseName, tab, "90");
+    return {};
+  }
+
+  return scanTranslate(filePath, tab);
+};
+
+const readDir = (baseDir, tab = "", result = {}) => {
+  const items = fs.readdirSync(baseDir);
+  return [...items].reduce((carry, item) => {
+    const itemPath = `${baseDir}/${item}`;
+    if (!fs.existsSync(itemPath)) return carry;
+
+    const state = fs.statSync(itemPath);
+    const accu = state.isFile()
+      ? { ...carry, ...proceedFile(itemPath, tab) }
+      : result;
+
+    if (state.isDirectory()) {
+      display(item, tab, "1;36");
+      return {
+        ...carry,
+        ...readDir(itemPath, indentTab(tab), accu),
+      };
+    }
+
+    return accu;
+  }, result);
+};
+
+const writeToFile = (result) => {
+  console.log(result);
+  const ts = new Date().getTime();
+  const filename = `${ts}-locale.json`;
+  console.log("\nWriting to file...");
+  fs.writeFile(path.resolve(filename), JSON.stringify(result), (error) => {
+    if (error || false) {
+      console.log({ error });
+      throw new Error(error);
+    }
+    console.log(`Saved to ${filename}`);
+    console.log("--- DONE ---\n");
+  });
+};
+
+const pathDir = path.resolve(pathToScan);
+const result = readDir(pathDir);
+writeToFile(result);
